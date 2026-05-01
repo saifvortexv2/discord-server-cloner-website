@@ -1,27 +1,51 @@
-const { runCloner } = require("../script/cloner");
+const { Worker } = require('worker_threads');
+const path = require('path');
 
 exports.copy = async (req, res) => {
-    const { token, copyId, pasteId, selectedOptions } = req.body || {};
+    const { token, copyId, pasteId, selectedOptions, socketId } = req.body || {};
     try {
         if (!token || !copyId || !pasteId) {
             return res.status(400).json({ success: false, message: "Missing fields" });
         }
 
-        runCloner(token, copyId, pasteId, selectedOptions || { all: true }, (log) => {
+        const worker = new Worker(path.join(__dirname, '../script/cloner.js'), {
+            workerData: { token, sourceId: copyId, targetId: pasteId, selectedOptions: selectedOptions || { all: true } }
+        });
 
-            if (global.io) {
-                global.io.emit("terminal-log", log);
-            }
-        }).then(() => {
-            if (global.io) {
-                global.io.emit("cloning-complete");
+        worker.on('message', (data) => {
+            if (data.type === 'log') {
+                if (global.io && socketId) {
+                    global.io.to(socketId).emit("terminal-log", data.message);
+                }
+            } else if (data.type === 'complete') {
+                if (global.io && socketId) {
+                    global.io.to(socketId).emit("cloning-complete");
+                }
+            } else if (data.type === 'error') {
+                if (global.io && socketId) {
+                    global.io.to(socketId).emit("terminal-log", `Fatal Error: ${data.message}`);
+                }
             }
         });
 
+        worker.on('error', (error) => {
+            console.error('Worker error:', error);
+            if (global.io && socketId) {
+                global.io.to(socketId).emit("terminal-log", `Worker Error: ${error.message}`);
+            }
+        });
+
+        worker.on('exit', (code) => {
+            if (code !== 0) {
+                console.error(`Worker stopped with exit code ${code}`);
+            }
+        });
 
         return res.status(200).json({ success: true, message: "Cloning process started." });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ success: false, message: "Something went wrong" });
     }
-}
+}
+
+

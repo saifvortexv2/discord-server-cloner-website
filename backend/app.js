@@ -18,7 +18,6 @@ const PORT = process.env.PORT || 4000;
 app.use(express.json());
 app.use(cors({ origin: "http://localhost:3000" }));
 
-// Global io instance for use in controllers
 global.io = io;
 
 const copyRoute = require("./routes/copy.route");
@@ -31,4 +30,4 @@ io.on("connection", (socket) => {
     });
 });
 
-server.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server started on port ${PORT}`));

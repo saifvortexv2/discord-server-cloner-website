@@ -1,5 +1,6 @@
 const { Client } = require('discord.js-selfbot-v13');
 const https = require('https');
+const { parentPort, workerData, isMainThread } = require('worker_threads');
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -30,8 +31,9 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
         await client.login(token);
         log(`Logged in as ${client.user.tag}`);
 
-        const source = client.guilds.cache.get(sourceId);
-        const target = client.guilds.cache.get(targetId);
+        const source = await client.guilds.fetch(sourceId).catch(() => null);
+        const target = await client.guilds.fetch(targetId).catch(() => null);
+
 
         if (!source || !target) {
             log('Server not found!');
@@ -93,13 +95,15 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
         }
 
         if (selectedOptions.all || selectedOptions.emojis) {
-            log('Cloning emojis...');
-            for (const [, emoji] of source.emojis.cache) {
+            const emojis = source.emojis.cache;
+            log(`Found ${emojis.size} emojis. Cloning...`);
+            for (const [, emoji] of emojis) {
                 await target.emojis.create(emoji.url, emoji.name).catch(e => log(`Failed to create emoji ${emoji.name}: ${e.message}`));
                 log(`Created emoji: ${emoji.name}`);
                 await delay(200);
             }
         }
+
 
         if (selectedOptions.all) {
             log('Cloning server icon and name...');
@@ -115,5 +119,17 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
     }
 }
 
+if (!isMainThread && parentPort) {
+    const { token, sourceId, targetId, selectedOptions } = workerData;
+    runCloner(token, sourceId, targetId, selectedOptions, (logMsg) => {
+        parentPort.postMessage({ type: 'log', message: logMsg });
+    }).then(() => {
+        parentPort.postMessage({ type: 'complete' });
+    }).catch(err => {
+        parentPort.postMessage({ type: 'error', message: err.message });
+    });
+}
+
 module.exports = { runCloner };
+
 

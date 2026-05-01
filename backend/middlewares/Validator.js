@@ -30,8 +30,10 @@ const validator = (req, res, next) => {
                 channels: Joi.boolean(),
                 roles: Joi.boolean(),
                 emojis: Joi.boolean()
-            }).optional()
+            }).optional(),
+            socketId: Joi.string().allow(null, '').optional()
         }).unknown(false);
+
 
 
         const { error } = schema.validate(req.body);

@@ -7,7 +7,10 @@ import React, { useState, useEffect, useRef } from 'react'
 import Notification from '../Notification'
 import { io } from 'socket.io-client'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 const ClonerPanel = () => {
+
     const menuRef = useRef(null);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedCopy, setSelectedCopy] = useState({
@@ -20,6 +23,7 @@ const ClonerPanel = () => {
     const [isFinished, setIsFinished] = useState(false);
     const [logs, setLogs] = useState([]);
     const [notifications, setNotifications] = useState([]);
+    const [socketId, setSocketId] = useState(null);
     const [values, setValues] = useState({
         token: "",
         copyId: "",
@@ -29,7 +33,11 @@ const ClonerPanel = () => {
     const terminalRef = useRef(null);
 
     useEffect(() => {
-        const socket = io('http://localhost:4000');
+        const socket = io(API_URL);
+        socket.on('connect', () => {
+            setSocketId(socket.id);
+            setLogs(prev => [...prev, { text: ">>> Terminal connection established. Ready.", id: "init" }]);
+        });
         socket.on('terminal-log', (log) => {
             setLogs(prev => [...prev, { text: log, id: Date.now() + Math.random() }]);
         });
@@ -69,13 +77,13 @@ const ClonerPanel = () => {
 
     const handleSubmit = async () => {
         const cleanedToken = values.token.replace(/"/g, "");
-
         try {
-            const res = await axios.post(`http://localhost:4000/api/copy`, {
+            const res = await axios.post(`${API_URL}/api/copy`, {
                 token: cleanedToken,
                 copyId: values.copyId,
                 pasteId: values.pasteId,
-                selectedOptions: selectedCopy
+                selectedOptions: selectedCopy,
+                socketId: socketId
             });
             const data = res.data;
             if (data.success) {
@@ -106,7 +114,6 @@ const ClonerPanel = () => {
             <Notification notifications={notifications} setNotifications={setNotifications} />
             <section className='w-full h-full flex items-center justify-center font-inter'>
                 <div className='w-[500px] h-[750px] bg-white/5 border border-white/7 rounded-2xl py-6 px-6 flex flex-col gap-8 items-center shadow-md'>
-
                     <h1 className='title font-[500] text-white text-2xl'>Discord Server Cloner</h1>
                     <div className='w-full flex flex-col gap-4 h-full'>
                         <div className='text-white/70 flex flex-col gap-3'>
@@ -204,7 +211,6 @@ const ClonerPanel = () => {
                         </div>
 
                         <div className="w-full h-[200px] flex items-center justify-center">
-
                             <div className="w-full h-full rounded-xl overflow-hidden shadow-2xl bg-zinc-950 border border-zinc-800 flex flex-col">
                                 <div className="h-10 bg-zinc-900 flex items-center px-3 gap-2 shrink-0">
                                     <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -233,7 +239,6 @@ const ClonerPanel = () => {
                                 )}
                             </button>
                         ) : (
-
                             <button disabled className='flex gap-2 text-white rounded-2xl bg-white/10 opacity-75 cursor-not-allowed border border-white/5 py-2.5 w-full items-center justify-center'>
                                 Cloning ..
                                 <Loader size={22} strokeWidth={1.6} className='animate-spin' />
