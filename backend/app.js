@@ -9,7 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:3000",
+        origin: "https://clone.saifx.xyz",
         methods: ["GET", "POST"]
     }
 });
@@ -18,7 +18,7 @@ const PORT = process.env.PORT || 4000;
 
 app.use(helmet());
 app.use(express.json());
-app.use(cors({ origin: "http://localhost:3000" }));
+app.use(cors({ origin: "https://clone.saifx.xyz" }));
 
 global.io = io;
 
