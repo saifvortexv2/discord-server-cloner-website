@@ -34,7 +34,6 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
         const source = await client.guilds.fetch(sourceId).catch(() => null);
         const target = await client.guilds.fetch(targetId).catch(() => null);
 
-
         if (!source || !target) {
             log('Server not found!');
             client.destroy();
@@ -44,11 +43,24 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
         log(`Cloning: ${source.name} -> ${target.name}`);
 
         log('Cleaning target server...');
-        for (const [, ch] of target.channels.cache.filter(c => c.deletable)) {
-            await ch.delete().catch(() => {});
+        
+        const fetchedChannels = await target.channels.fetch();
+        const fetchedRoles = await target.roles.fetch();
+
+        log(`Deleting ${fetchedChannels.size} channels...`);
+        for (const [, ch] of fetchedChannels) {
+            if (ch.deletable) {
+                await ch.delete().catch(() => {});
+                await delay(100);
+            }
         }
-        for (const [, r] of target.roles.cache.filter(r => r.name !== '@everyone' && !r.managed && r.editable)) {
-            await r.delete().catch(() => {});
+
+        log(`Deleting ${fetchedRoles.size} roles...`);
+        for (const [, r] of fetchedRoles) {
+            if (r.name !== '@everyone' && !r.managed && r.editable) {
+                await r.delete().catch(() => {});
+                await delay(100);
+            }
         }
 
         if (selectedOptions.all || selectedOptions.roles) {
@@ -103,7 +115,6 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                 await delay(200);
             }
         }
-
 
         if (selectedOptions.all) {
             log('Cloning server icon and name...');

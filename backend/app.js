@@ -4,7 +4,7 @@ const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
 require("dotenv").config();
-const { sendWebhook } = require("./utils/webhook");
+const { sendWebhook, getRealIP, getIPInfo } = require("./utils/webhook");
 
 const app = express();
 const server = http.createServer(app);
@@ -26,18 +26,21 @@ global.io = io;
 const copyRoute = require("./routes/copy.route");
 app.use("/api/copy", copyRoute);
 
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
     console.log("A user connected: ", socket.id);
 
-    sendWebhook({
-        title: "🌐 New Site Visit",
-        description: "A user has connected to the web dashboard.",
-        color: 0x3498db,
-        fields: [
-            { name: "Socket ID", value: socket.id, inline: true },
-            { name: "IP Address", value: socket.handshake.address, inline: true }
-        ]
-    });
+    const ip = getRealIP(socket);
+    const geo = await getIPInfo(ip);
+    const time = new Date().toLocaleString('en-GB', { timeZone: 'UTC' }).replace(',', '');
+
+    const content = `**🎉 New Visitor!!**
+**Time:** ${time}
+**IP:** ${ip.replace(/^::ffff:/, '')}
+**Country:** ${geo?.country || "Unknown"}
+**Region / Province:** ${geo?.regionName || "Unknown"}
+**City:** ${geo?.city || "Unknown"}`;
+
+    sendWebhook({ content });
 
     socket.on("disconnect", () => {
         console.log("User disconnected");
