@@ -4,14 +4,6 @@ const { parentPort, workerData, isMainThread } = require('worker_threads');
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function withTimeout(promise, timeoutMs = 30000) {
-    let timeoutId;
-    const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Operation timed out')), timeoutMs);
-    });
-    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
-}
-
 async function downloadImage(url) {
     return new Promise((resolve, reject) => {
         https.get(url, (res) => {
@@ -36,11 +28,11 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
     };
 
     try {
-        await withTimeout(client.login(token), 15000);
+        await client.login(token);
         log(`Logged in as ${client.user.tag}`);
 
-        const source = await withTimeout(client.guilds.fetch(sourceId), 10000).catch(() => null);
-        const target = await withTimeout(client.guilds.fetch(targetId), 10000).catch(() => null);
+        const source = await client.guilds.fetch(sourceId).catch(() => null);
+        const target = await client.guilds.fetch(targetId).catch(() => null);
 
         if (!source || !target) {
             log('Server not found!');
@@ -52,13 +44,13 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
 
         log('Cleaning target server...');
         
-        const fetchedChannels = await withTimeout(target.channels.fetch(), 10000).catch(() => []);
-        const fetchedRoles = await withTimeout(target.roles.fetch(), 10000).catch(() => []);
+        const fetchedChannels = await target.channels.fetch().catch(() => []);
+        const fetchedRoles = await target.roles.fetch().catch(() => []);
 
         log(`Deleting ${fetchedChannels.size || 0} channels...`);
         for (const [, ch] of fetchedChannels) {
             try {
-                await withTimeout(ch.delete(), 10000);
+                await ch.delete();
                 await delay(500);
             } catch (err) {
                 log(`Failed to delete channel ${ch.name}: ${err.message}`);
@@ -70,7 +62,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
         for (const [, r] of fetchedRoles) {
             if (r.name !== '@everyone' && !r.managed) {
                 try {
-                    await withTimeout(r.delete(), 10000);
+                    await r.delete();
                     deletedCount++;
                     await delay(500);
                 } catch (err) {
@@ -85,13 +77,13 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             const roles = source.roles.cache.filter(r => r.name !== '@everyone').sort((a, b) => b.position - a.position);
             for (const [, r] of roles) {
                 try {
-                    const nr = await withTimeout(target.roles.create({ 
+                    const nr = await target.roles.create({ 
                         name: r.name, 
                         color: r.hexColor, 
                         permissions: r.permissions, 
                         hoist: r.hoist, 
                         mentionable: r.mentionable 
-                    }), 15000);
+                    });
                     roleMapping.set(r.id, nr.id);
                     log(`Created role: ${r.name}`);
                     await delay(800);
@@ -107,7 +99,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             const cats = source.channels.cache.filter(c => c.type === 'GUILD_CATEGORY').sort((a, b) => a.position - b.position);
             for (const [, c] of cats) {
                 try {
-                    await withTimeout(target.channels.create(c.name, { type: 'GUILD_CATEGORY', position: c.position }), 15000);
+                    await target.channels.create(c.name, { type: 'GUILD_CATEGORY', position: c.position });
                     log(`Created category: ${c.name}`);
                     await delay(800);
                 } catch (err) {
@@ -120,7 +112,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             for (const [, c] of channels) {
                 try {
                     const parent = c.parent ? target.channels.cache.find(p => p.name === c.parent.name && p.type === 'GUILD_CATEGORY') : null;
-                    await withTimeout(target.channels.create(c.name, { 
+                    await target.channels.create(c.name, { 
                         type: c.type, 
                         parent: parent?.id, 
                         position: c.position, 
@@ -128,7 +120,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                         nsfw: c.nsfw, 
                         bitrate: c.bitrate, 
                         userLimit: c.userLimit 
-                    }), 15000);
+                    });
                     log(`Created channel: ${c.name}`);
                     await delay(800);
                 } catch (err) {
@@ -143,7 +135,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             log(`Found ${emojis.size} emojis. Cloning...`);
             for (const [, emoji] of emojis) {
                 try {
-                    await withTimeout(target.emojis.create(emoji.url, emoji.name), 20000);
+                    await target.emojis.create(emoji.url, emoji.name);
                     log(`Created emoji: ${emoji.name}`);
                     await delay(800);
                 } catch (e) {
@@ -158,9 +150,9 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             try {
                 if (source.iconURL()) {
                     const img = await downloadImage(source.iconURL({ format: 'png', size: 1024 }));
-                    await withTimeout(target.setIcon(img), 20000);
+                    await target.setIcon(img);
                 }
-                await withTimeout(target.setName(source.name), 10000);
+                await target.setName(source.name);
             } catch (err) {
                 log(`Failed to update server info: ${err.message}`);
             }
