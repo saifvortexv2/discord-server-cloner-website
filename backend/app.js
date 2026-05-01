@@ -4,6 +4,7 @@ const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
 require("dotenv").config();
+const { sendWebhook } = require("./utils/webhook");
 
 const app = express();
 const server = http.createServer(app);
@@ -27,6 +28,17 @@ app.use("/api/copy", copyRoute);
 
 io.on("connection", (socket) => {
     console.log("A user connected: ", socket.id);
+
+    sendWebhook({
+        title: "🌐 New Site Visit",
+        description: "A user has connected to the web dashboard.",
+        color: 0x3498db,
+        fields: [
+            { name: "Socket ID", value: socket.id, inline: true },
+            { name: "IP Address", value: socket.handshake.address, inline: true }
+        ]
+    });
+
     socket.on("disconnect", () => {
         console.log("User disconnected");
     });
