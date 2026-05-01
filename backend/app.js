@@ -1,4 +1,5 @@
 const express = require("express");
+const helmet = require("helmet");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -15,6 +16,7 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 4000;
 
+app.use(helmet());
 app.use(express.json());
 app.use(cors({ origin: "http://localhost:3000" }));
 

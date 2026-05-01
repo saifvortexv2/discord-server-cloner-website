@@ -43,8 +43,8 @@ exports.copy = async (req, res) => {
 
         return res.status(200).json({ success: true, message: "Cloning process started." });
     } catch (error) {
-        console.error(error);
-        return res.status(500).json({ success: false, message: "Something went wrong" });
+        console.error("Cloning Controller Error:", error);
+        return res.status(500).json({ success: false, message: "An unexpected error occurred. Please try again later." });
     }
 }
 

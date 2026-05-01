@@ -36,7 +36,7 @@ const ClonerPanel = () => {
         const socket = io(API_URL);
         socket.on('connect', () => {
             setSocketId(socket.id);
-            setLogs(prev => [...prev, { text: ">>> Terminal connection established. Ready.", id: "init" }]);
+            setLogs(prev => [...prev, { text: "", id: "init" }]);
         });
         socket.on('terminal-log', (log) => {
             setLogs(prev => [...prev, { text: log, id: Date.now() + Math.random() }]);
