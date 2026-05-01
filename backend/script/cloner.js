@@ -83,7 +83,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             log('Cloning roles...');
             const roles = Array.from(source.roles.cache.values())
                 .filter(r => r.name !== '@everyone' && !r.managed)
-                .sort((a, b) => a.position - b.position);
+                .sort((a, b) => b.position - a.position);
 
             for (const r of roles) {
                 try {
@@ -108,7 +108,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             log('Cloning categories and channels...');
             const cats = Array.from(source.channels.cache.values())
                 .filter(c => c.type === 'GUILD_CATEGORY')
-                .sort((a, b) => a.position - b.position);
+                .sort((a, b) => b.position - a.position);
 
             for (const c of cats) {
                 try {
@@ -123,7 +123,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
 
             const channels = Array.from(source.channels.cache.values())
                 .filter(c => c.type === 'GUILD_TEXT' || c.type === 'GUILD_VOICE')
-                .sort((a, b) => a.position - b.position);
+                .sort((a, b) => b.position - a.position);
 
             for (const c of channels) {
                 try {
