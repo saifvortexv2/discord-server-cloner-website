@@ -49,23 +49,17 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
 
         log(`Deleting ${fetchedChannels.size} channels...`);
         for (const [, ch] of fetchedChannels) {
-            if (ch.deletable) {
-                await ch.delete().catch((err) => log(`Failed to delete channel ${ch.name}: ${err.message}`));
-                await delay(500);
-            }
+            await ch.delete().catch((err) => log(`Failed to delete channel ${ch.name}: ${err.message}`));
+            await delay(500);
         }
 
         log(`Deleting ${fetchedRoles.size} roles...`);
         let deletedCount = 0;
         for (const [, r] of fetchedRoles) {
             if (r.name !== '@everyone' && !r.managed) {
-                if (r.editable) {
-                    await r.delete().catch((err) => log(`Failed to delete role ${r.name}: ${err.message}`));
-                    deletedCount++;
-                    await delay(500);
-                } else {
-                    log(`Role ${r.name} is not editable (above bot's role or missing permissions).`);
-                }
+                await r.delete().catch((err) => log(`Failed to delete role ${r.name}: ${err.message}`));
+                deletedCount++;
+                await delay(500);
             }
         }
         log(`Successfully requested deletion of ${deletedCount} roles.`);

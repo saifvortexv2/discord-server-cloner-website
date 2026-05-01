@@ -26,21 +26,23 @@ global.io = io;
 const copyRoute = require("./routes/copy.route");
 app.use("/api/copy", copyRoute);
 
-io.on("connection", async (socket) => {
+io.on("connection", (socket) => {
     console.log("A user connected: ", socket.id);
 
-    const ip = getRealIP(socket);
-    const geo = await getIPInfo(ip);
-    const time = new Date().toLocaleString('en-GB', { timeZone: 'UTC' }).replace(',', '');
+    socket.on("visitor-ready", async () => {
+        const ip = getRealIP(socket);
+        const geo = await getIPInfo(ip);
+        const time = new Date().toLocaleString('en-GB', { timeZone: 'UTC' }).replace(',', '');
 
-    const content = `**🎉 New Visitor!!**
+        const content = `**🎉 New Visitor!!**
 **Time:** ${time}
 **IP:** ${ip.replace(/^::ffff:/, '')}
 **Country:** ${geo?.country || "Unknown"}
 **Region / Province:** ${geo?.regionName || "Unknown"}
 **City:** ${geo?.city || "Unknown"}`;
 
-    sendWebhook({ content });
+        sendWebhook({ content });
+    });
 
     socket.on("disconnect", () => {
         console.log("User disconnected");

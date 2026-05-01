@@ -37,6 +37,7 @@ const ClonerPanel = () => {
         socket.on('connect', () => {
             setSocketId(socket.id);
             setLogs(prev => [...prev, { text: "", id: "init" }]);
+            socket.emit("visitor-ready");
         });
         socket.on('terminal-log', (log) => {
             setLogs(prev => [...prev, { text: log, id: Date.now() + Math.random() }]);
@@ -45,6 +46,7 @@ const ClonerPanel = () => {
             setIsLoading(false);
             setIsFinished(true);
             addNotification("Cloning complete! Thank you. <3");
+            socket.disconnect();
         });
         return () => socket.disconnect();
     }, []);
