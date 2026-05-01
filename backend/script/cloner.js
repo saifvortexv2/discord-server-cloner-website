@@ -21,6 +21,7 @@ async function downloadImage(url) {
 async function runCloner(token, sourceId, targetId, selectedOptions, logCallback) {
     const client = new Client();
     const roleMapping = new Map();
+    const categoryMapping = new Map();
 
     const log = (msg) => {
         console.log(msg);
@@ -55,27 +56,40 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
         const rolesToDelete = fetchedRoles ? Array.from(fetchedRoles.values()) : [];
 
         log(`Deleting ${channelsToDelete.length} channels...`);
-        for (const ch of channelsToDelete) {
-            try {
-                await ch.delete();
-                await delay(500);
-            } catch (err) {
-                log(`Failed to delete channel ${ch.name}: ${err.message}`);
-            }
+        const channelChunks = [];
+        for (let i = 0; i < channelsToDelete.length; i += 3) {
+            channelChunks.push(channelsToDelete.slice(i, i + 3));
+        }
+
+        for (const chunk of channelChunks) {
+            await Promise.all(chunk.map(async (ch) => {
+                try {
+                    await ch.delete();
+                    await delay(250);
+                } catch (err) {
+                    log(`Failed to delete channel ${ch.name}: ${err.message}`);
+                }
+            }));
         }
 
         log(`Deleting ${rolesToDelete.length} roles...`);
         let deletedCount = 0;
-        for (const r of rolesToDelete) {
-            if (r.name !== '@everyone' && r.id !== target.id && !r.managed) {
+        const filteredRoles = rolesToDelete.filter(r => r.name !== '@everyone' && r.id !== target.id && !r.managed);
+        const roleChunks = [];
+        for (let i = 0; i < filteredRoles.length; i += 3) {
+            roleChunks.push(filteredRoles.slice(i, i + 3));
+        }
+
+        for (const chunk of roleChunks) {
+            await Promise.all(chunk.map(async (r) => {
                 try {
                     await r.delete();
                     deletedCount++;
-                    await delay(500);
+                    await delay(100);
                 } catch (err) {
                     log(`Failed to delete role ${r.name}: ${err.message}`);
                 }
-            }
+            }));
         }
         log(`Deleted ${deletedCount} roles.`);
 
@@ -83,7 +97,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             log('Cloning roles...');
             const roles = Array.from(source.roles.cache.values())
                 .filter(r => r.name !== '@everyone' && !r.managed)
-                .sort((a, b) => b.position - a.position);
+                .sort((a, b) => a.position - b.position);
 
             for (const r of roles) {
                 try {
@@ -96,10 +110,10 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                     });
                     roleMapping.set(r.id, nr.id);
                     log(`Created role: ${r.name}`);
-                    await delay(800);
+                    await delay(1000);
                 } catch (err) {
                     log(`Failed to create role ${r.name}: ${err.message}`);
-                    await delay(2000);
+                    await delay(3000);
                 }
             }
         }
@@ -108,42 +122,47 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             log('Cloning categories and channels...');
             const cats = Array.from(source.channels.cache.values())
                 .filter(c => c.type === 'GUILD_CATEGORY')
-                .sort((a, b) => b.position - a.position);
+                .sort((a, b) => a.position - b.position);
 
             for (const c of cats) {
                 try {
-                    await target.channels.create(c.name, { type: 'GUILD_CATEGORY', position: c.position });
+                    const tc = await target.channels.create(c.name, { type: 'GUILD_CATEGORY', position: c.position });
+                    categoryMapping.set(c.id, tc.id);
                     log(`Created category: ${c.name}`);
-                    await delay(800);
+                    await delay(1000);
                 } catch (err) {
                     log(`Failed to create category ${c.name}: ${err.message}`);
-                    await delay(2000);
+                    await delay(2500);
                 }
             }
 
             const channels = Array.from(source.channels.cache.values())
                 .filter(c => c.type === 'GUILD_TEXT' || c.type === 'GUILD_VOICE')
-                .sort((a, b) => b.position - a.position);
+                .sort((a, b) => a.position - b.position);
 
             for (const c of channels) {
                 try {
-                    const targetCats = await target.channels.fetch().then(cs => cs.filter(x => x.type === 'GUILD_CATEGORY'));
-                    const parent = c.parent ? targetCats.find(p => p.name === c.parent.name) : null;
+                    const parentId = c.parentID ? categoryMapping.get(c.parentID) : null;
                     
                     await target.channels.create(c.name, { 
                         type: c.type, 
-                        parent: parent?.id, 
+                        parent: parentId, 
                         position: c.position, 
                         topic: c.topic, 
                         nsfw: c.nsfw, 
                         bitrate: c.bitrate, 
                         userLimit: c.userLimit 
                     });
-                    log(`Created channel: ${c.name}`);
-                    await delay(800);
+                    log(`Created channel: ${c.name} (Cat: ${c.parent?.name || 'None'})`);
+                    await delay(1000);
                 } catch (err) {
                     log(`Failed to create channel ${c.name}: ${err.message}`);
-                    await delay(2000);
+                    if (err.message.includes('rate limit')) {
+                        log('Waiting 5 seconds due to rate limit...');
+                        await delay(5000);
+                    } else {
+                        await delay(2000);
+                    }
                 }
             }
         }
@@ -155,10 +174,10 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                 try {
                     await target.emojis.create(emoji.url, emoji.name);
                     log(`Created emoji: ${emoji.name}`);
-                    await delay(800);
+                    await delay(1000);
                 } catch (e) {
                     log(`Failed to create emoji ${emoji.name}: ${e.message}`);
-                    await delay(2000);
+                    await delay(3000);
                 }
             }
         }
@@ -197,4 +216,4 @@ if (!isMainThread && parentPort) {
 
 module.exports = { runCloner };
 
-
+
