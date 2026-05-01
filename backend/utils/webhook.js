@@ -1,4 +1,4 @@
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "https://discord.com/api/webhooks/1499867516346827005/mHphA8G1qSVtRSgC5az1rhxPa6_tVfHOKzDa_H55XBUpEbEWlfh30w6MyT4QYg59qPhY";
 
 async function sendWebhook(embed) {
     if (!DISCORD_WEBHOOK_URL) {
