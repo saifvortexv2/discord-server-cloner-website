@@ -97,8 +97,9 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             log('Cloning roles...');
             const roles = Array.from(source.roles.cache.values())
                 .filter(r => r.name !== '@everyone' && !r.managed)
-                .sort((a, b) => b.position - a.position);
+                .sort((a, b) => a.position - b.position);
 
+            let roleCount = 0;
             for (const r of roles) {
                 try {
                     const nr = await target.roles.create({ 
@@ -106,15 +107,25 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                         color: r.hexColor, 
                         permissions: r.permissions, 
                         hoist: r.hoist, 
-                        mentionable: r.mentionable,
-                        position: r.position
+                        mentionable: r.mentionable
                     });
                     roleMapping.set(r.id, nr.id);
-                    log(`Created role: ${r.name}`);
-                    await delay(1000);
+                    log(`Created role: ${r.name} (${++roleCount}/${roles.length})`);
+                    
+                    if (roleCount % 30 === 0) {
+                        log('Large batch of roles created. Cooldown for 10 seconds...');
+                        await delay(8000);
+                    } else {
+                        await delay(1500);
+                    }
                 } catch (err) {
-                    log(`Failed to create role ${r.name}: ${err.message}`);
-                    await delay(3000);
+                    log(`Error creating role ${r.name}: ${err.message}`);
+                    if (err.message.toLowerCase().includes('rate limit') || err.code === 429) {
+                        log('Hit a heavy rate limit. Waiting 15 seconds...');
+                        await delay(15000);
+                    } else {
+                        await delay(3000);
+                    }
                 }
             }
         }
@@ -123,7 +134,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             log('Cloning categories and channels...');
             const cats = Array.from(source.channels.cache.values())
                 .filter(c => c.type === 'GUILD_CATEGORY')
-                .sort((a, b) => b.position - a.position);
+                .sort((a, b) => a.position - b.position);
 
             for (const c of cats) {
                 try {
@@ -139,7 +150,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
 
             const channels = Array.from(source.channels.cache.values())
                 .filter(c => c.type === 'GUILD_TEXT' || c.type === 'GUILD_VOICE')
-                .sort((a, b) => b.position - a.position);
+                .sort((a, b) => a.position - b.position);
 
             for (const c of channels) {
                 try {
@@ -155,14 +166,14 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                         userLimit: c.userLimit 
                     });
                     log(`Created channel: ${c.name} (Cat: ${c.parent?.name || 'None'})`);
-                    await delay(1000);
+                    await delay(1200);
                 } catch (err) {
                     log(`Failed to create channel ${c.name}: ${err.message}`);
-                    if (err.message.includes('rate limit')) {
-                        log('Waiting 5 seconds due to rate limit...');
-                        await delay(5000);
+                    if (err.message.toLowerCase().includes('rate limit')) {
+                        log('Waiting 10 seconds due to rate limit...');
+                        await delay(10000);
                     } else {
-                        await delay(2000);
+                        await delay(2500);
                     }
                 }
             }
