@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme {
+  --font-inter: var(--font-inter);
+}
+
+.title {
+  position: relative;
+}
+
+.title::before {
+  content: "";
+  height: 2px;
+  width: 50%;
+  top: -10px;
+  right: 50%;
+  background-color: #fff;
+  position: absolute;
+  border-radius: 15px;
+  transition: right 0.5s ease;
+}
+
+.title::after {
+  content: "";
+  height: 2px;
+  width: 50%;
+  bottom: -10px;
+  left: 50%;
+  background-color: #fff;
+  position: absolute;
+  border-radius: 15px;
+  transition: left 0.5s ease;
+}
+
+.title:hover::after {
+  left: 0;
+}
+
+.title:hover::before {
+  right: 0;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
