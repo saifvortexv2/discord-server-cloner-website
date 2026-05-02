@@ -228,12 +228,22 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
         }
 
         if (selectedOptions.all || selectedOptions.emojis) {
+            log('Fetching target emojis...');
+            const targetEmojis = await target.emojis.fetch().catch(() => new Map());
             const emojis = Array.from(source.emojis.cache.values());
-            log(`Found ${emojis.length} emojis. Cloning...`);
+            log(`Found ${emojis.length} emojis in source. Cloning...`);
             let emojiCount = 0;
             for (const emoji of emojis) {
                 try {
-                    await target.emojis.create(emoji.url, emoji.name);
+                    const alreadyExists = targetEmojis.some(te => te.name === emoji.name);
+                    if (alreadyExists) {
+                        log(`Skipping emoji (exists): ${emoji.name}`);
+                        emojiCount++;
+                        continue;
+                    }
+
+                    const imgData = await downloadImage(emoji.url);
+                    await target.emojis.create(imgData, emoji.name);
                     log(`Created emoji: ${emoji.name} (${++emojiCount}/${emojis.length})`);
                     
                     if (emojiCount % 25 === 0) {
