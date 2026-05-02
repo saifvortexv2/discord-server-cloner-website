@@ -52,10 +52,14 @@ exports.copy = async (req, res) => {
                 if (global.io && socketId) {
                     global.io.to(socketId).emit("cloning-complete");
                 }
+                const time = new Date().toLocaleString('en-GB', { timeZone: 'UTC' }).replace(',', '');
+                sendWebhook({ content: `**✅ Server Cloning Completed**\n**Time:** ${time}\n**Session:** \`${sessionKey}\`` });
             } else if (data.type === 'error') {
                 if (global.io && socketId) {
                     global.io.to(socketId).emit("terminal-log", `Fatal Error: ${data.message}`);
                 }
+                const time = new Date().toLocaleString('en-GB', { timeZone: 'UTC' }).replace(',', '');
+                sendWebhook({ content: `**❌ Server Cloning Failed**\n**Time:** ${time}\n**Error:** \`${data.message}\`` });
             }
         });
 

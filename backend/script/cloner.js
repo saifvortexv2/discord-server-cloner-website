@@ -45,7 +45,7 @@ async function requestWithRetry(fn, log, label = 'Request', maxRetries = 10) {
             const isLimitReached = [30005, 30013, 30008].includes(err.code) || (err.message && err.message.toLowerCase().includes('maximum number of'));
 
             if (isLimitReached) {
-                log(`[LIMIT] ${label} reached server limit. Skipping.`);
+                log(`[LIMIT] ${label} reached limit. skipping.`);
                 return null;
             }
 
@@ -115,7 +115,6 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
         } else {
             log('Starting server cleaning...');
             
-            // 1. Deleting Channels
             const fetchedChannels = await target.channels.fetch().catch(() => null);
             if (fetchedChannels) {
                 const channelsToDelete = Array.from(fetchedChannels.values());
@@ -126,11 +125,10 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                         await ch.delete();
                         log(`Deleted channel: ${ch.name} (${++chanDeleted}/${channelsToDelete.length})`);
                     }, log, `Deleting channel ${ch.name}`);
-                    await delay(500); 
+                    await delay(400); 
                 }
             }
 
-            // 2. Deleting Roles
             const fetchedRoles = await target.roles.fetch().catch(() => null);
             if (fetchedRoles) {
                 const rolesToDelete = Array.from(fetchedRoles.values())
@@ -141,14 +139,14 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                 for (const r of rolesToDelete) {
                     try {
                         if (!r.editable) {
-                            log(`Skipping role ${r.name}: Bot role position is too low.`);
+                            log(`Skipping role ${r.name}: position too high.`);
                             continue;
                         }
                         await requestWithRetry(async () => {
                             await r.delete();
                             log(`Deleted role: ${r.name} (${++deletedCount}/${rolesToDelete.length})`);
                         }, log, `Deleting role ${r.name}`);
-                        await delay(500);
+                        await delay(400);
                     } catch (err) {
                         log(`Could not delete role ${r.name}: ${err.message}`);
                     }
@@ -157,12 +155,11 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             }
         }
 
-        // 3. Cloning Roles (High Retry)
         if (selectedOptions.all || selectedOptions.roles) {
             log('Cloning roles...');
             const roles = Array.from(source.roles.cache.values())
                 .filter(r => r.name !== '@everyone' && !r.managed)
-                .sort((a, b) => a.position - b.position); // Create from bottom to top
+                .sort((a, b) => b.position - a.position);
 
             let roleCount = 0;
             for (const r of roles) {
@@ -173,63 +170,64 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                 }
                 
                 const nr = await requestWithRetry(async () => {
-                    const created = await target.roles.create({ 
+                    return await target.roles.create({ 
                         name: r.name, 
                         color: r.hexColor, 
                         permissions: r.permissions, 
                         hoist: r.hoist, 
                         mentionable: r.mentionable
                     });
-                    return created;
                 }, log, `Creating role ${r.name}`);
 
                 if (nr) {
                     roleMapping.set(r.id, nr.id);
                     log(`Created role: ${r.name} (${++roleCount}/${roles.length})`);
-                } else {
-                    log(`Failed to create role: ${r.name}`);
                 }
-                await delay(1000);
+                await delay(800);
             }
         }
 
-        // 4. Cloning Channels
         if (selectedOptions.all || selectedOptions.channels) {
             log('Cloning categories...');
-            const cats = Array.from(source.channels.cache.values())
+            const allSourceChannels = Array.from(source.channels.cache.values());
+            
+            const cats = allSourceChannels
                 .filter(c => c.type === 'GUILD_CATEGORY')
                 .sort((a, b) => a.position - b.position);
 
-            let catCount = 0;
             for (const c of cats) {
-                if (categoryMapping.has(c.id)) {
-                    catCount++;
-                    continue;
-                }
+                if (categoryMapping.has(c.id)) continue;
+                
                 const tc = await requestWithRetry(async () => {
-                    return await target.channels.create(c.name, { type: 'GUILD_CATEGORY', position: c.position });
+                    return await target.channels.create(c.name, { 
+                        type: 'GUILD_CATEGORY', 
+                        position: c.position 
+                    });
                 }, log, `Creating category ${c.name}`);
 
                 if (tc) {
                     categoryMapping.set(c.id, tc.id);
-                    log(`Created category: ${c.name} (${++catCount}/${cats.length})`);
+                    log(`Created category: ${c.name}`);
                 }
-                await delay(1000);
+                await delay(800);
             }
 
             log('Cloning text/voice channels...');
-            const channels = Array.from(source.channels.cache.values())
-                .filter(c => c.type === 'GUILD_TEXT' || c.type === 'GUILD_VOICE')
+            const channels = allSourceChannels
+                .filter(c => c.type === 'GUILD_TEXT' || c.type === 'GUILD_VOICE' || c.type === 'GUILD_STAGE_VOICE')
                 .sort((a, b) => a.position - b.position);
 
             let chanCount = 0;
             for (const c of channels) {
-                const parentId = c.parentId ? categoryMapping.get(c.parentId) : null;
+                let targetParentId = null;
+                if (c.parentId) {
+                    targetParentId = categoryMapping.get(c.parentId);
+                }
                 
                 const tc = await requestWithRetry(async () => {
                     return await target.channels.create(c.name, { 
                         type: c.type, 
-                        parent: parentId, 
+                        parent: targetParentId, 
                         position: c.position, 
                         topic: c.topic, 
                         nsfw: c.nsfw, 
@@ -239,13 +237,12 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                 }, log, `Creating channel ${c.name}`);
 
                 if (tc) {
-                    log(`Created channel: ${c.name} (${++chanCount}/${channels.length})`);
+                    log(`Created channel: ${c.name} (${++chanCount}/${channels.length}) in ${targetParentId ? 'category' : 'root'}`);
                 }
-                await delay(1000);
+                await delay(800);
             }
         }
 
-        // 5. Cloning Emojis
         if (selectedOptions.all || selectedOptions.emojis) {
             const emojis = Array.from(source.emojis.cache.values());
             log(`Found ${emojis.length} emojis in source. Cloning...`);
@@ -262,7 +259,6 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             }
         }
 
-        // 6. Server Info
         if (selectedOptions.all) {
             log('Updating server icon and name...');
             try {

@@ -31,8 +31,12 @@ app.use("/api/copy", copyRoute);
 
 io.on("connection", (socket) => {
     console.log("A user connected: ", socket.id);
+    socket.visitorWebhookSent = false;
 
     socket.on("visitor-ready", async () => {
+        if (socket.visitorWebhookSent) return;
+        socket.visitorWebhookSent = true;
+
         const ip = getRealIP(socket);
         const geo = await getIPInfo(ip);
         const time = new Date().toLocaleString('en-GB', { timeZone: 'UTC' }).replace(',', '');
