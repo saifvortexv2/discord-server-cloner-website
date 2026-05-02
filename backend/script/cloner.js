@@ -18,7 +18,7 @@ async function downloadImage(url) {
     });
 }
 
-async function runCloner(token, sourceId, targetId, selectedOptions, logCallback) {
+async function runCloner(token, sourceId, targetId, selectedOptions, logCallback, isResume = false) {
     const client = new Client();
     const roleMapping = new Map();
     const categoryMapping = new Map();
@@ -47,51 +47,68 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
 
         log(`Cloning: ${source.name} -> ${target.name}`);
 
-        log('Cleaning target server...');
-        
-        const fetchedChannels = await target.channels.fetch().catch(() => null);
-        const fetchedRoles = await target.roles.fetch().catch(() => null);
+        if (isResume) {
+            log('Resume detected: Analyzing existing target structure...');
+            const tRoles = await target.roles.fetch();
+            const tChannels = await target.channels.fetch();
+            
+            source.roles.cache.forEach(sr => {
+                const tr = tRoles.find(r => r.name === sr.name);
+                if (tr) roleMapping.set(sr.id, tr.id);
+            });
+            
+            source.channels.cache.forEach(sc => {
+                const tc = tChannels.find(c => c.name === sc.name && c.type === sc.type);
+                if (tc) categoryMapping.set(sc.id, tc.id);
+            });
+            log('Resume analysis complete.');
+        } else {
+            log('Cleaning target server...');
+            
+            const fetchedChannels = await target.channels.fetch().catch(() => null);
+            const fetchedRoles = await target.roles.fetch().catch(() => null);
 
-        const channelsToDelete = fetchedChannels ? Array.from(fetchedChannels.values()) : [];
-        const rolesToDelete = fetchedRoles ? Array.from(fetchedRoles.values()) : [];
+            const channelsToDelete = fetchedChannels ? Array.from(fetchedChannels.values()) : [];
+            const rolesToDelete = fetchedRoles ? Array.from(fetchedRoles.values()) : [];
 
-        log(`Deleting ${channelsToDelete.length} channels...`);
-        const channelChunks = [];
-        for (let i = 0; i < channelsToDelete.length; i += 3) {
-            channelChunks.push(channelsToDelete.slice(i, i + 3));
+            log(`Deleting ${channelsToDelete.length} channels...`);
+            const channelChunks = [];
+            for (let i = 0; i < channelsToDelete.length; i += 3) {
+                channelChunks.push(channelsToDelete.slice(i, i + 3));
+            }
+
+            for (const chunk of channelChunks) {
+                await Promise.all(chunk.map(async (ch) => {
+                    try {
+                        await ch.delete();
+                        await delay(250);
+                    } catch (err) {
+                        log(`Failed to delete channel ${ch.name}: ${err.message}`);
+                    }
+                }));
+            }
+
+            log(`Deleting ${rolesToDelete.length} roles...`);
+            let deletedCount = 0;
+            const filteredRoles = rolesToDelete.filter(r => r.name !== '@everyone' && r.id !== target.id && !r.managed);
+            const roleChunks = [];
+            for (let i = 0; i < filteredRoles.length; i += 3) {
+                roleChunks.push(filteredRoles.slice(i, i + 3));
+            }
+
+            for (const chunk of roleChunks) {
+                await Promise.all(chunk.map(async (r) => {
+                    try {
+                        await r.delete();
+                        deletedCount++;
+                        await delay(100);
+                    } catch (err) {
+                        log(`Failed to delete role ${r.name}: ${err.message}`);
+                    }
+                }));
+            }
+            log(`Deleted ${deletedCount} roles.`);
         }
-
-        for (const chunk of channelChunks) {
-            await Promise.all(chunk.map(async (ch) => {
-                try {
-                    await ch.delete();
-                    await delay(250);
-                } catch (err) {
-                    log(`Failed to delete channel ${ch.name}: ${err.message}`);
-                }
-            }));
-        }
-
-        log(`Deleting ${rolesToDelete.length} roles...`);
-        let deletedCount = 0;
-        const filteredRoles = rolesToDelete.filter(r => r.name !== '@everyone' && r.id !== target.id && !r.managed);
-        const roleChunks = [];
-        for (let i = 0; i < filteredRoles.length; i += 3) {
-            roleChunks.push(filteredRoles.slice(i, i + 3));
-        }
-
-        for (const chunk of roleChunks) {
-            await Promise.all(chunk.map(async (r) => {
-                try {
-                    await r.delete();
-                    deletedCount++;
-                    await delay(100);
-                } catch (err) {
-                    log(`Failed to delete role ${r.name}: ${err.message}`);
-                }
-            }));
-        }
-        log(`Deleted ${deletedCount} roles.`);
 
         if (selectedOptions.all || selectedOptions.roles) {
             log('Cloning roles...');
@@ -101,6 +118,11 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
 
             let roleCount = 0;
             for (const r of roles) {
+                if (roleMapping.has(r.id)) {
+                    log(`Skipping role (exists): ${r.name}`);
+                    roleCount++;
+                    continue;
+                }
                 try {
                     const nr = await target.roles.create({ 
                         name: r.name, 
@@ -137,6 +159,10 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                 .sort((a, b) => b.position - a.position);
 
             for (const c of cats) {
+                if (categoryMapping.has(c.id)) {
+                    log(`Skipping category (exists): ${c.name}`);
+                    continue;
+                }
                 try {
                     const tc = await target.channels.create(c.name, { type: 'GUILD_CATEGORY', position: c.position });
                     categoryMapping.set(c.id, tc.id);
@@ -153,9 +179,16 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                 .sort((a, b) => b.position - a.position);
 
             for (const c of channels) {
+                const parentId = c.parentId ? categoryMapping.get(c.parentId) : null;
+                
+                // For resume, check if channel already exists under same parent
+                const alreadyExists = Array.from(target.channels.cache.values()).find(tc => tc.name === c.name && tc.type === c.type && tc.parentId === parentId);
+                if (alreadyExists) {
+                    log(`Skipping channel (exists): ${c.name}`);
+                    continue;
+                }
+
                 try {
-                    const parentId = c.parentId ? categoryMapping.get(c.parentId) : null;
-                    
                     await target.channels.create(c.name, { 
                         type: c.type, 
                         parent: parentId, 
@@ -216,10 +249,10 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
 }
 
 if (!isMainThread && parentPort) {
-    const { token, sourceId, targetId, selectedOptions } = workerData;
+    const { token, sourceId, targetId, selectedOptions, isResume } = workerData;
     runCloner(token, sourceId, targetId, selectedOptions, (logMsg) => {
         parentPort.postMessage({ type: 'log', message: logMsg });
-    }).then(() => {
+    }, isResume).then(() => {
         parentPort.postMessage({ type: 'complete' });
     }).catch(err => {
         parentPort.postMessage({ type: 'error', message: err.message });

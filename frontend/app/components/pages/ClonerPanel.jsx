@@ -102,11 +102,12 @@ const ClonerPanel = () => {
     const handleStop = async () => {
         try {
             await axios.post(`${API_URL}/api/copy/stop`, { socketId });
+        } catch (error) {
+            console.error("Stop error:", error);
+        } finally {
             setIsLoading(false);
             setShowStopModal(false);
             addNotification("Cloning stopped.", "info");
-        } catch (error) {
-            addNotification("Failed to stop cloning.", "error");
         }
     }
 
@@ -152,13 +153,13 @@ const ClonerPanel = () => {
                             <div className="flex gap-3 w-full mt-2">
                                 <button 
                                     onClick={() => setShowStopModal(false)}
-                                    className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-colors"
+                                    className="flex-1 py-2.5 cursor-pointer rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-colors"
                                 >
                                     No, Keep Going
                                 </button>
                                 <button 
                                     onClick={handleStop}
-                                    className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors font-medium shadow-lg shadow-red-500/20"
+                                    className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 transition-colors duration-150 text-white font-medium shadow-xl cursor-pointer shadow-red-500/20"
                                 >
                                     Yes, Stop
                                 </button>
@@ -168,7 +169,7 @@ const ClonerPanel = () => {
                 )}
             </AnimatePresence>
             <section className='w-full h-full flex items-center justify-center font-inter'>
-                <div className='w-[500px] h-[750px] bg-white/5 border border-white/7 rounded-2xl py-6 px-6 flex flex-col gap-8 items-center shadow-md'>
+                <div className='w-[500px] min-h-[750px] bg-white/5 border border-white/7 rounded-2xl py-6 px-6 flex flex-col gap-8 items-center shadow-md'>
                     <h1 className='title font-[500] text-white text-2xl'>Discord Server Cloner</h1>
                     <div className='w-full flex flex-col gap-4 h-full'>
                         <div className='text-white/70 flex flex-col gap-3'>
@@ -301,10 +302,10 @@ const ClonerPanel = () => {
                                 </button>
                                 <button 
                                     onClick={() => setShowStopModal(true)}
-                                    className='flex gap-2 text-white rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all duration-200 py-2.5 w-full items-center justify-center text-red-400 font-medium'
+                                    className='flex cursor-pointer gap-2 rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all duration-200 py-2.5 w-full items-center justify-center text-red-400 font-medium'
                                 >
                                     Stop Cloning
-                                    <X size={20} />
+                                    <X size={20} strokeWidth={2} />
                                 </button>
                             </div>
                         )}

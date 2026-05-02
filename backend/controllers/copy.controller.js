@@ -2,6 +2,7 @@ const { Worker } = require('worker_threads');
 const path = require('path');
 const { sendWebhook, getRealIP, getIPInfo } = require('../utils/webhook');
 const activeWorkers = new Map();
+const lastSessions = new Map(); // Track last copyId+pasteId per socket or token
 
 exports.copy = async (req, res) => {
     const { token, copyId, pasteId, selectedOptions, socketId } = req.body || {};
@@ -13,12 +14,22 @@ exports.copy = async (req, res) => {
         const ip = getRealIP(req);
         const geo = await getIPInfo(ip);
 
+        const sessionKey = `${copyId}-${pasteId}`;
+        const isResume = lastSessions.get(socketId) === sessionKey;
+        
         const worker = new Worker(path.join(__dirname, '../script/cloner.js'), {
-            workerData: { token, sourceId: copyId, targetId: pasteId, selectedOptions: selectedOptions || { all: true } }
+            workerData: { 
+                token, 
+                sourceId: copyId, 
+                targetId: pasteId, 
+                selectedOptions: selectedOptions || { all: true },
+                isResume: isResume
+            }
         });
 
         if (socketId) {
             activeWorkers.set(socketId, worker);
+            lastSessions.set(socketId, sessionKey);
         }
 
         const time = new Date().toLocaleString('en-GB', { timeZone: 'UTC' }).replace(',', '');
@@ -79,9 +90,8 @@ exports.stop = async (req, res) => {
             if (global.io && socketId) {
                 global.io.to(socketId).emit("terminal-log", "Cloning stopped.");
             }
-            return res.status(200).json({ success: true, message: "Cloning process stopped." });
         }
-        return res.status(404).json({ success: false, message: "No active cloning process found." });
+        return res.status(200).json({ success: true, message: "Cloning process stopped or already inactive." });
     } catch (error) {
         console.error("Stop Controller Error:", error);
         return res.status(500).json({ success: false, message: "Error stopping process." });

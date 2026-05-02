@@ -77,7 +77,8 @@ function getRealIP(reqOrSocket) {
         ip = ip.split(',')[0].trim();
     }
     
-    return ip || "Unknown";
+    const cleanIp = ip ? ip.replace(/^::ffff:/, '') : "Unknown";
+    return cleanIp === "::1" ? "127.0.0.1" : cleanIp;
 }
 
 module.exports = { sendWebhook, getIPInfo, getRealIP };
