@@ -72,40 +72,39 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             const rolesToDelete = fetchedRoles ? Array.from(fetchedRoles.values()) : [];
 
             log(`Deleting ${channelsToDelete.length} channels...`);
-            const channelChunks = [];
-            for (let i = 0; i < channelsToDelete.length; i += 3) {
-                channelChunks.push(channelsToDelete.slice(i, i + 3));
-            }
-
-            for (const chunk of channelChunks) {
-                await Promise.all(chunk.map(async (ch) => {
-                    try {
-                        await ch.delete();
-                        await delay(250);
-                    } catch (err) {
-                        log(`Failed to delete channel ${ch.name}: ${err.message}`);
+            let chanDeleted = 0;
+            for (const ch of channelsToDelete) {
+                try {
+                    await ch.delete();
+                    log(`Deleted channel: ${ch.name} (${++chanDeleted}/${channelsToDelete.length})`);
+                    await delay(1000); // 1s delay between deletions
+                } catch (err) {
+                    log(`Failed to delete channel ${ch.name}: ${err.message}`);
+                    if (err.message.toLowerCase().includes('rate limit') || err.code === 429) {
+                        await delay(10000);
+                    } else {
+                        await delay(1000);
                     }
-                }));
+                }
             }
 
             log(`Deleting ${rolesToDelete.length} roles...`);
             let deletedCount = 0;
             const filteredRoles = rolesToDelete.filter(r => r.name !== '@everyone' && r.id !== target.id && !r.managed);
-            const roleChunks = [];
-            for (let i = 0; i < filteredRoles.length; i += 3) {
-                roleChunks.push(filteredRoles.slice(i, i + 3));
-            }
-
-            for (const chunk of roleChunks) {
-                await Promise.all(chunk.map(async (r) => {
-                    try {
-                        await r.delete();
-                        deletedCount++;
-                        await delay(100);
-                    } catch (err) {
-                        log(`Failed to delete role ${r.name}: ${err.message}`);
+            
+            for (const r of filteredRoles) {
+                try {
+                    await r.delete();
+                    log(`Deleted role: ${r.name} (${++deletedCount}/${filteredRoles.length})`);
+                    await delay(1000); // 1s delay between deletions
+                } catch (err) {
+                    log(`Failed to delete role ${r.name}: ${err.message}`);
+                    if (err.message.toLowerCase().includes('rate limit') || err.code === 429) {
+                        await delay(10000);
+                    } else {
+                        await delay(1000);
                     }
-                }));
+                }
             }
             log(`Deleted ${deletedCount} roles.`);
         }
@@ -123,30 +122,38 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                     roleCount++;
                     continue;
                 }
-                try {
-                    const nr = await target.roles.create({ 
-                        name: r.name, 
-                        color: r.hexColor, 
-                        permissions: r.permissions, 
-                        hoist: r.hoist, 
-                        mentionable: r.mentionable
-                    });
-                    roleMapping.set(r.id, nr.id);
-                    log(`Created role: ${r.name} (${++roleCount}/${roles.length})`);
-                    
-                    if (roleCount % 30 === 0) {
-                        log('Large batch of roles created. Cooldown for 8 seconds...');
-                        await delay(8000);
-                    } else {
-                        await delay(1000);
-                    }
-                } catch (err) {
-                    log(`Error creating role ${r.name}: ${err.message}`);
-                    if (err.message.toLowerCase().includes('rate limit') || err.code === 429) {
-                        log('Hit a heavy rate limit. Waiting 15 seconds...');
-                        await delay(15000);
-                    } else {
-                        await delay(3000);
+                
+                let created = false;
+                let attempts = 0;
+                while (!created && attempts < 5) {
+                    try {
+                        const nr = await target.roles.create({ 
+                            name: r.name, 
+                            color: r.hexColor, 
+                            permissions: r.permissions, 
+                            hoist: r.hoist, 
+                            mentionable: r.mentionable
+                        });
+                        roleMapping.set(r.id, nr.id);
+                        log(`Created role: ${r.name} (${++roleCount}/${roles.length})`);
+                        created = true;
+                        
+                        if (roleCount % 20 === 0) {
+                            log('Cooldown for 8 seconds to prevent rate limits...');
+                            await delay(8000);
+                        } else {
+                            await delay(1200);
+                        }
+                    } catch (err) {
+                        attempts++;
+                        log(`Error creating role ${r.name} (Attempt ${attempts}): ${err.message}`);
+                        if (err.message.toLowerCase().includes('rate limit') || err.code === 429) {
+                            log('Hit a heavy rate limit. Waiting 20 seconds...');
+                            await delay(20000);
+                        } else {
+                            await delay(3000);
+                            if (attempts >= 5) break;
+                        }
                     }
                 }
             }
@@ -165,20 +172,32 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                     catCount++;
                     continue;
                 }
-                try {
-                    const tc = await target.channels.create(c.name, { type: 'GUILD_CATEGORY', position: c.position });
-                    categoryMapping.set(c.id, tc.id);
-                    log(`Created category: ${c.name} (${++catCount}/${cats.length})`);
-                    
-                    if (catCount % 25 === 0) {
-                        log('Batch of categories created. Cooldown for 8 seconds...');
-                        await delay(8000);
-                    } else {
-                        await delay(1000);
+                let created = false;
+                let attempts = 0;
+                while (!created && attempts < 5) {
+                    try {
+                        const tc = await target.channels.create(c.name, { type: 'GUILD_CATEGORY', position: c.position });
+                        categoryMapping.set(c.id, tc.id);
+                        log(`Created category: ${c.name} (${++catCount}/${cats.length})`);
+                        created = true;
+                        
+                        if (catCount % 20 === 0) {
+                            log('Batch cooldown: 8 seconds...');
+                            await delay(8000);
+                        } else {
+                            await delay(1200);
+                        }
+                    } catch (err) {
+                        attempts++;
+                        log(`Failed to create category ${c.name} (Attempt ${attempts}): ${err.message}`);
+                        if (err.message.toLowerCase().includes('rate limit') || err.code === 429) {
+                            log('Waiting 15 seconds due to rate limit...');
+                            await delay(15000);
+                        } else {
+                            await delay(3000);
+                            if (attempts >= 5) break;
+                        }
                     }
-                } catch (err) {
-                    log(`Failed to create category ${c.name}: ${err.message}`);
-                    await delay(2500);
                 }
             }
 
@@ -197,31 +216,38 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                     continue;
                 }
 
-                try {
-                    await target.channels.create(c.name, { 
-                        type: c.type, 
-                        parent: parentId, 
-                        position: c.position, 
-                        topic: c.topic, 
-                        nsfw: c.nsfw, 
-                        bitrate: c.bitrate, 
-                        userLimit: c.userLimit 
-                    });
-                    log(`Created channel: ${c.name} (${++chanCount}/${channels.length})`);
-                    
-                    if (chanCount % 25 === 0) {
-                        log('Batch of channels created. Cooldown for 8 seconds...');
-                        await delay(8000);
-                    } else {
-                        await delay(1000);
-                    }
-                } catch (err) {
-                    log(`Failed to create channel ${c.name}: ${err.message}`);
-                    if (err.message.toLowerCase().includes('rate limit')) {
-                        log('Waiting 10 seconds due to rate limit...');
-                        await delay(10000);
-                    } else {
-                        await delay(2500);
+                let created = false;
+                let attempts = 0;
+                while (!created && attempts < 5) {
+                    try {
+                        await target.channels.create(c.name, { 
+                            type: c.type, 
+                            parent: parentId, 
+                            position: c.position, 
+                            topic: c.topic, 
+                            nsfw: c.nsfw, 
+                            bitrate: c.bitrate, 
+                            userLimit: c.userLimit 
+                        });
+                        log(`Created channel: ${c.name} (${++chanCount}/${channels.length})`);
+                        created = true;
+                        
+                        if (chanCount % 20 === 0) {
+                            log('Batch cooldown: 8 seconds...');
+                            await delay(8000);
+                        } else {
+                            await delay(1200);
+                        }
+                    } catch (err) {
+                        attempts++;
+                        log(`Failed to create channel ${c.name} (Attempt ${attempts}): ${err.message}`);
+                        if (err.message.toLowerCase().includes('rate limit') || err.code === 429) {
+                            log('Waiting 15 seconds due to rate limit...');
+                            await delay(15000);
+                        } else {
+                            await delay(3000);
+                            if (attempts >= 5) break;
+                        }
                     }
                 }
             }
@@ -243,17 +269,34 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                     }
 
                     const imgData = await downloadImage(emoji.url);
-                    await target.emojis.create(imgData, emoji.name);
-                    log(`Created emoji: ${emoji.name} (${++emojiCount}/${emojis.length})`);
                     
-                    if (emojiCount % 25 === 0) {
-                        log('Batch of emojis created. Cooldown for 8 seconds...');
-                        await delay(8000);
-                    } else {
-                        await delay(1000);
+                    let created = false;
+                    let attempts = 0;
+                    while (!created && attempts < 5) {
+                        try {
+                            await target.emojis.create(imgData, emoji.name);
+                            log(`Created emoji: ${emoji.name} (${++emojiCount}/${emojis.length})`);
+                            created = true;
+                            
+                            if (emojiCount % 20 === 0) {
+                                log('Batch cooldown: 8 seconds...');
+                                await delay(8000);
+                            } else {
+                                await delay(1200);
+                            }
+                        } catch (e) {
+                            attempts++;
+                            log(`Failed to create emoji ${emoji.name} (Attempt ${attempts}): ${e.message}`);
+                            if (e.message.toLowerCase().includes('rate limit') || e.code === 429) {
+                                await delay(15000);
+                            } else {
+                                await delay(3000);
+                                if (attempts >= 5) break;
+                            }
+                        }
                     }
                 } catch (e) {
-                    log(`Failed to create emoji ${emoji.name}: ${e.message}`);
+                    log(`Critical failure for emoji ${emoji.name}: ${e.message}`);
                     await delay(3000);
                 }
             }

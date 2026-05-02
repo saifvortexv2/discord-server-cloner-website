@@ -41,7 +41,10 @@ const ClonerPanel = () => {
             socket.emit("visitor-ready");
         });
         socket.on('terminal-log', (log) => {
-            setLogs(prev => [...prev, { text: log, id: Date.now() + Math.random() }]);
+            setLogs(prev => {
+                const newLogs = [...prev, { text: log, id: Date.now() + Math.random() }];
+                return newLogs.slice(-200); // Keep only the last 200 logs
+            });
         });
         socket.on('cloning-complete', () => {
             setIsLoading(false);
