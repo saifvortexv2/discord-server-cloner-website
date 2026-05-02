@@ -134,11 +134,11 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                     roleMapping.set(r.id, nr.id);
                     log(`Created role: ${r.name} (${++roleCount}/${roles.length})`);
                     
-                    if (roleCount % 50 === 0) {
-                        log('Large batch of roles created. Cooldown for 5 seconds...');
-                        await delay(5000);
+                    if (roleCount % 30 === 0) {
+                        log('Large batch of roles created. Cooldown for 8 seconds...');
+                        await delay(8000);
                     } else {
-                        await delay(800);
+                        await delay(1000);
                     }
                 } catch (err) {
                     log(`Error creating role ${r.name}: ${err.message}`);
@@ -174,7 +174,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                         log('Batch of categories created. Cooldown for 8 seconds...');
                         await delay(8000);
                     } else {
-                        await delay(1200);
+                        await delay(1000);
                     }
                 } catch (err) {
                     log(`Failed to create category ${c.name}: ${err.message}`);
@@ -190,7 +190,6 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             for (const c of channels) {
                 const parentId = c.parentId ? categoryMapping.get(c.parentId) : null;
                 
-                // For resume, check if channel already exists under same parent
                 const alreadyExists = Array.from(target.channels.cache.values()).find(tc => tc.name === c.name && tc.type === c.type && tc.parentId === parentId);
                 if (alreadyExists) {
                     log(`Skipping channel (exists): ${c.name}`);
@@ -211,10 +210,10 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                     log(`Created channel: ${c.name} (${++chanCount}/${channels.length})`);
                     
                     if (chanCount % 25 === 0) {
-                        log('Batch of channels created. Cooldown for 10 seconds...');
-                        await delay(10000);
+                        log('Batch of channels created. Cooldown for 8 seconds...');
+                        await delay(8000);
                     } else {
-                        await delay(1500);
+                        await delay(1000);
                     }
                 } catch (err) {
                     log(`Failed to create channel ${c.name}: ${err.message}`);
@@ -238,10 +237,10 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                     log(`Created emoji: ${emoji.name} (${++emojiCount}/${emojis.length})`);
                     
                     if (emojiCount % 25 === 0) {
-                        log('Batch of emojis created. Cooldown for 10 seconds...');
-                        await delay(10000);
+                        log('Batch of emojis created. Cooldown for 8 seconds...');
+                        await delay(8000);
                     } else {
-                        await delay(1200);
+                        await delay(1000);
                     }
                 } catch (e) {
                     log(`Failed to create emoji ${emoji.name}: ${e.message}`);
@@ -283,5 +282,3 @@ if (!isMainThread && parentPort) {
 }
 
 module.exports = { runCloner };
-
-
