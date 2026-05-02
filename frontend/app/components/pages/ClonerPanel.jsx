@@ -29,6 +29,7 @@ const ClonerPanel = () => {
         copyId: "",
         pasteId: ""
     });
+    const [showStopModal, setShowStopModal] = useState(false);
 
     const terminalRef = useRef(null);
 
@@ -98,6 +99,17 @@ const ClonerPanel = () => {
         }
     }
 
+    const handleStop = async () => {
+        try {
+            await axios.post(`${API_URL}/api/copy/stop`, { socketId });
+            setIsLoading(false);
+            setShowStopModal(false);
+            addNotification("Cloning stopped.", "info");
+        } catch (error) {
+            addNotification("Failed to stop cloning.", "error");
+        }
+    }
+
     const activeChips = Object.keys(selectedCopy).filter(key => selectedCopy[key]);
 
     useEffect(() => {
@@ -114,6 +126,47 @@ const ClonerPanel = () => {
     return (
         <>
             <Notification notifications={notifications} setNotifications={setNotifications} />
+            <AnimatePresence>
+                {showStopModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowStopModal(false)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative bg-zinc-900 border border-white/10 p-6 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col items-center gap-6"
+                        >
+                            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center text-red-500">
+                                <X size={32} />
+                            </div>
+                            <div className="text-center">
+                                <h3 className="text-xl font-semibold text-white">Stop Cloning?</h3>
+                                <p className="text-white/60 mt-2">Are you sure you want to stop the cloning process? This action cannot be undone.</p>
+                            </div>
+                            <div className="flex gap-3 w-full mt-2">
+                                <button 
+                                    onClick={() => setShowStopModal(false)}
+                                    className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-colors"
+                                >
+                                    No, Keep Going
+                                </button>
+                                <button 
+                                    onClick={handleStop}
+                                    className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors font-medium shadow-lg shadow-red-500/20"
+                                >
+                                    Yes, Stop
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
             <section className='w-full h-full flex items-center justify-center font-inter'>
                 <div className='w-[500px] h-[750px] bg-white/5 border border-white/7 rounded-2xl py-6 px-6 flex flex-col gap-8 items-center shadow-md'>
                     <h1 className='title font-[500] text-white text-2xl'>Discord Server Cloner</h1>
@@ -221,7 +274,7 @@ const ClonerPanel = () => {
                                 </div>
                                 <div ref={terminalRef} className="w-full flex-1 bg-black p-2 font-mono text-[10px] text-green-500 overflow-y-auto custom-scrollbar">
                                     {logs.map(log => (
-                                        <div key={log.id} className="mb-0.5">
+                                        <div key={log.id} className={`mb-0.5 ${log.text === "Cloning stopped." ? "text-red-500" : ""}`}>
                                             {log.text}
                                         </div>
                                     ))}
@@ -241,10 +294,19 @@ const ClonerPanel = () => {
                                 )}
                             </button>
                         ) : (
-                            <button disabled className='flex gap-2 text-white rounded-2xl bg-white/10 opacity-75 cursor-not-allowed border border-white/5 py-2.5 w-full items-center justify-center'>
-                                Cloning ..
-                                <Loader size={22} strokeWidth={1.6} className='animate-spin' />
-                            </button>
+                            <div className="w-full flex flex-col gap-2">
+                                <button disabled className='flex gap-2 text-white rounded-2xl bg-white/10 opacity-75 cursor-not-allowed border border-white/5 py-2.5 w-full items-center justify-center'>
+                                    Cloning ..
+                                    <Loader size={22} strokeWidth={1.6} className='animate-spin' />
+                                </button>
+                                <button 
+                                    onClick={() => setShowStopModal(true)}
+                                    className='flex gap-2 text-white rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all duration-200 py-2.5 w-full items-center justify-center text-red-400 font-medium'
+                                >
+                                    Stop Cloning
+                                    <X size={20} />
+                                </button>
+                            </div>
                         )}
 
                         <div className="text-center text-white/70 text-[14px]">

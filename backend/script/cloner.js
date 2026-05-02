@@ -97,7 +97,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             log('Cloning roles...');
             const roles = Array.from(source.roles.cache.values())
                 .filter(r => r.name !== '@everyone' && !r.managed)
-                .sort((a, b) => a.position - b.position);
+                .sort((a, b) => b.position - a.position);
 
             let roleCount = 0;
             for (const r of roles) {
@@ -112,11 +112,11 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                     roleMapping.set(r.id, nr.id);
                     log(`Created role: ${r.name} (${++roleCount}/${roles.length})`);
                     
-                    if (roleCount % 30 === 0) {
-                        log('Large batch of roles created. Cooldown for 10 seconds...');
-                        await delay(8000);
+                    if (roleCount % 50 === 0) {
+                        log('Large batch of roles created. Cooldown for 5 seconds...');
+                        await delay(5000);
                     } else {
-                        await delay(1500);
+                        await delay(800);
                     }
                 } catch (err) {
                     log(`Error creating role ${r.name}: ${err.message}`);
@@ -134,7 +134,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             log('Cloning categories and channels...');
             const cats = Array.from(source.channels.cache.values())
                 .filter(c => c.type === 'GUILD_CATEGORY')
-                .sort((a, b) => a.position - b.position);
+                .sort((a, b) => b.position - a.position);
 
             for (const c of cats) {
                 try {
@@ -150,11 +150,11 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
 
             const channels = Array.from(source.channels.cache.values())
                 .filter(c => c.type === 'GUILD_TEXT' || c.type === 'GUILD_VOICE')
-                .sort((a, b) => a.position - b.position);
+                .sort((a, b) => b.position - a.position);
 
             for (const c of channels) {
                 try {
-                    const parentId = c.parentID ? categoryMapping.get(c.parentID) : null;
+                    const parentId = c.parentId ? categoryMapping.get(c.parentId) : null;
                     
                     await target.channels.create(c.name, { 
                         type: c.type, 
