@@ -93,7 +93,6 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
 
         await source.roles.fetch();
         await source.channels.fetch();
-        await source.emojis.fetch();
 
         log(`Cloning: ${source.name} -> ${target.name}`);
 
@@ -214,7 +213,10 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
 
             log('Cloning text/voice channels...');
             const channels = allSourceChannels
-                .filter(c => c.type === 'GUILD_TEXT' || c.type === 'GUILD_VOICE' || c.type === 'GUILD_STAGE_VOICE')
+                .filter(c => (c.type === 'GUILD_TEXT' || c.type === 'GUILD_VOICE' || c.type === 'GUILD_STAGE_VOICE') && 
+                             !c.name.startsWith('ticket-') && 
+                             !c.name.startsWith('closed-') && 
+                             !c.name.startsWith('by-'))
                 .sort((a, b) => a.position - b.position);
 
             let chanCount = 0;
@@ -243,21 +245,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
             }
         }
 
-        if (selectedOptions.all || selectedOptions.emojis) {
-            const emojis = Array.from(source.emojis.cache.values());
-            log(`Found ${emojis.length} emojis in source. Cloning...`);
-            let emojiCount = 0;
-            for (const emoji of emojis) {
-                const imgData = await downloadImage(emoji.url).catch(() => null);
-                if (!imgData) continue;
 
-                await requestWithRetry(async () => {
-                    await target.emojis.create(imgData, emoji.name);
-                    log(`Created emoji: ${emoji.name} (${++emojiCount}/${emojis.length})`);
-                }, log, `Creating emoji ${emoji.name}`);
-                await delay(1000);
-            }
-        }
 
         if (selectedOptions.all) {
             log('Updating server icon and name...');

@@ -17,7 +17,6 @@ const ClonerPanel = () => {
         all: true,
         channels: false,
         roles: false,
-        emojis: false,
     });
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isFinished, setIsFinished] = useState(false);
@@ -71,7 +70,7 @@ const ClonerPanel = () => {
 
     const toggleOption = (option) => {
         if (option === 'all') {
-            setSelectedCopy({ all: !selectedCopy.all, channels: false, roles: false, emojis: false });
+            setSelectedCopy({ all: !selectedCopy.all, channels: false, roles: false });
         } else {
             setSelectedCopy(prev => ({ ...prev, all: false, [option]: !prev[option] }));
         }
@@ -251,9 +250,7 @@ const ClonerPanel = () => {
                                                 <span onClick={(e) => { e.stopPropagation(); toggleOption('roles'); }} className={`flex items-center justify-between px-3 py-2 hover:bg-white/10 rounded-xl transition-colors duration-150 ${selectedCopy.roles ? 'text-green-500' : ''}`}>
                                                     Roles {selectedCopy.roles && <Check />}
                                                 </span>
-                                                <span onClick={(e) => { e.stopPropagation(); toggleOption('emojis'); }} className={`flex items-center justify-between px-3 py-2 hover:bg-white/10 rounded-xl transition-colors duration-150 ${selectedCopy.emojis ? 'text-green-500' : ''}`}>
-                                                    Emojis {selectedCopy.emojis && <Check />}
-                                                </span>
+
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
