@@ -158,16 +158,24 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                 .filter(c => c.type === 'GUILD_CATEGORY')
                 .sort((a, b) => b.position - a.position);
 
+            let catCount = 0;
             for (const c of cats) {
                 if (categoryMapping.has(c.id)) {
                     log(`Skipping category (exists): ${c.name}`);
+                    catCount++;
                     continue;
                 }
                 try {
                     const tc = await target.channels.create(c.name, { type: 'GUILD_CATEGORY', position: c.position });
                     categoryMapping.set(c.id, tc.id);
-                    log(`Created category: ${c.name}`);
-                    await delay(1000);
+                    log(`Created category: ${c.name} (${++catCount}/${cats.length})`);
+                    
+                    if (catCount % 25 === 0) {
+                        log('Batch of categories created. Cooldown for 8 seconds...');
+                        await delay(8000);
+                    } else {
+                        await delay(1200);
+                    }
                 } catch (err) {
                     log(`Failed to create category ${c.name}: ${err.message}`);
                     await delay(2500);
@@ -178,6 +186,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                 .filter(c => c.type === 'GUILD_TEXT' || c.type === 'GUILD_VOICE')
                 .sort((a, b) => b.position - a.position);
 
+            let chanCount = 0;
             for (const c of channels) {
                 const parentId = c.parentId ? categoryMapping.get(c.parentId) : null;
                 
@@ -185,6 +194,7 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                 const alreadyExists = Array.from(target.channels.cache.values()).find(tc => tc.name === c.name && tc.type === c.type && tc.parentId === parentId);
                 if (alreadyExists) {
                     log(`Skipping channel (exists): ${c.name}`);
+                    chanCount++;
                     continue;
                 }
 
@@ -198,8 +208,14 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
                         bitrate: c.bitrate, 
                         userLimit: c.userLimit 
                     });
-                    log(`Created channel: ${c.name} (Cat: ${c.parent?.name || 'None'})`);
-                    await delay(1200);
+                    log(`Created channel: ${c.name} (${++chanCount}/${channels.length})`);
+                    
+                    if (chanCount % 25 === 0) {
+                        log('Batch of channels created. Cooldown for 10 seconds...');
+                        await delay(10000);
+                    } else {
+                        await delay(1500);
+                    }
                 } catch (err) {
                     log(`Failed to create channel ${c.name}: ${err.message}`);
                     if (err.message.toLowerCase().includes('rate limit')) {
@@ -215,11 +231,18 @@ async function runCloner(token, sourceId, targetId, selectedOptions, logCallback
         if (selectedOptions.all || selectedOptions.emojis) {
             const emojis = Array.from(source.emojis.cache.values());
             log(`Found ${emojis.length} emojis. Cloning...`);
+            let emojiCount = 0;
             for (const emoji of emojis) {
                 try {
                     await target.emojis.create(emoji.url, emoji.name);
-                    log(`Created emoji: ${emoji.name}`);
-                    await delay(1000);
+                    log(`Created emoji: ${emoji.name} (${++emojiCount}/${emojis.length})`);
+                    
+                    if (emojiCount % 25 === 0) {
+                        log('Batch of emojis created. Cooldown for 10 seconds...');
+                        await delay(10000);
+                    } else {
+                        await delay(1200);
+                    }
                 } catch (e) {
                     log(`Failed to create emoji ${emoji.name}: ${e.message}`);
                     await delay(3000);
